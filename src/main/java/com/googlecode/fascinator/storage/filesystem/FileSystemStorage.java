@@ -18,6 +18,8 @@
  */
 package com.googlecode.fascinator.storage.filesystem;
 
+import ch.qos.logback.core.rolling.helper.FileFilterUtil;
+
 import com.googlecode.fascinator.api.PluginDescription;
 import com.googlecode.fascinator.api.storage.DigitalObject;
 import com.googlecode.fascinator.api.storage.Storage;
@@ -31,6 +33,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
@@ -38,6 +41,10 @@ import java.util.Set;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.FileFilterUtils;
+import org.apache.commons.io.filefilter.IOFileFilter;
+import org.apache.commons.io.filefilter.NameFileFilter;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,10 +247,12 @@ public class FileSystemStorage implements Storage {
         if (objectList == null) {
             objectList = new HashSet<String>();
 
-            List<File> files = new ArrayList<File>();
-            listFileRecur(files, homeDir);
-
+            
+            log.debug("Building list of Metadata Files for path: " + homeDir.getAbsolutePath());
+            Collection<File> files = listFileRecur(homeDir);
+            log.debug("Found " + files.size() + " Metadata Files");
             for (File file : files) {
+            	log.debug("Processing metadata file:" + file.getAbsolutePath());
                 Properties sofMeta = new Properties();
                 InputStream is;
                 try {
@@ -258,33 +267,43 @@ public class FileSystemStorage implements Storage {
                                 file.getAbsolutePath(), objectId);
                     }
                     objectList.add(objectId);
+                    try
+                    {
+                		is.close();
+                    }
+                    catch (Exception e)
+                    {
+                        log.error("Closing TF-OBJ-META failed",e);
+                    }
+
                 } catch (FileNotFoundException e) {
                     log.error("Error reading object metadata file", e);
                 } catch (IOException e) {
                     log.error("Error loading properties metadata", e);
-                }
+                } 
 
             }
         }
         return objectList;
     }
 
-    private void listFileRecur(List<File> files, File path) {
+    private Collection<File> listFileRecur(File path) {
         // log.debug("listFileRecur()");
-        if (path.isDirectory()) {
-            for (File file : path.listFiles()) {
-                if (path.isDirectory()) {
-                    listFileRecur(files, file);
-                } else {
-                    if (file.getName().equals(DEFAULT_METADATA_PAYLOAD)) {
-                        files.add(file);
-                    }
-                }
-            }
-        } else {
-            if (path.getName().equals(DEFAULT_METADATA_PAYLOAD)) {
-                files.add(path);
-            }
-        }
+//        if (path.isDirectory()) {
+//            for (File file : path.listFiles()) {
+//                if (path.isDirectory()) {
+//                    listFileRecur(files, file);
+//                } else {
+//                    if (file.getName().equals(DEFAULT_METADATA_PAYLOAD)) {
+//                        files.add(file);
+//                    }
+//                }
+//            }
+//        } else {
+//            if (path.getName().equals(DEFAULT_METADATA_PAYLOAD)) {
+//                files.add(path);
+//            }
+//        }
+    	return FileUtils.listFiles(path, FileFilterUtils.nameFileFilter(DEFAULT_METADATA_PAYLOAD), FileFilterUtils.trueFileFilter());
     }
 }
